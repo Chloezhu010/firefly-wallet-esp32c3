@@ -7,4 +7,4 @@
 - Breadboard
 
 # Datasheet
-- XIAO ESP32 C3
+- XIAO ESP32 C3 wiki: https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/
