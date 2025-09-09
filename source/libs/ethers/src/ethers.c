@@ -258,7 +258,7 @@ void ethers_addressToChecksumAddress(const uint8_t *address, char *checksumAddre
 
     // Compute the hash of the address
     uint8_t hashed[32];
-    ethers_keccak256(&checksumAddress[2], 40, hashed);
+    ethers_keccak256((const uint8_t*)&checksumAddress[2], 40, hashed);
 
     // Do the checksum
     for (uint8_t i = 0; i < 40; i += 2) {
@@ -277,7 +277,7 @@ bool ethers_privateKeyToChecksumAddress(const uint8_t *privateKey, char *address
     bool success = ethers_privateKeyToAddress(privateKey, (uint8_t*)address);
     if (!success) { return false; }
 
-    ethers_addressToChecksumAddress(address, address);
+    ethers_addressToChecksumAddress((const uint8_t*)address, address);
 
     return true;
 }

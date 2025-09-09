@@ -3,6 +3,60 @@
 #include "esp_system.h" // system functions
 #include "esp_random.h" // random number generator
 #include "../../source/libs/ethers/src/ethers.h" // ethereum lib
+#include "../../source/libs/ethers/src/ethers.c"
+#include "../../source/libs/ethers/src/keccak256.c"
+#include "../../source/libs/ethers/src/uECC.c"
+#include <string.h> // for memcmp
+#include <stdio.h> // for printf
+#include <unistd.h>
+
+/* debug function */
+void check_nvs_partition_info() {
+  Serial.println("=== Checking NVS partition info ===");
+  // get nvs partition info
+  const esp_partition_t *nvs_partition = esp_partition_find_first(
+    ESP_PARTITION_TYPE_DATA, 
+    ESP_PARTITION_SUBTYPE_DATA_NVS, 
+    NULL);
+  if (nvs_partition != NULL) {
+    Serial.printf("NVS partition size: %d bytes (%.1f KB)\n",
+                nvs_partition->size, nvs_partition->size / 1024.0);
+    Serial.printf("NVS partition address: %p\n", nvs_partition->address);
+  }
+}
+
+/* debug function */
+void check_nvs_usage() {
+  Serial.println("=== Checking NVS usage ===");
+
+  nvs_stats_t stats;
+  esp_err_t err = nvs_get_stats(NULL, &stats);
+  int used = stats.used_entries;
+  int free = stats.free_entries;
+  int available = stats.available_entries;
+  int total = stats.total_entries;
+  if (err == ESP_OK) {
+    printf(
+      "Count: Used Entries = (%d), "
+      "Free Entries = (%d), "
+      "Available Entries = (%d), "
+      "All Entries = (%d)\n",
+      used, free, available, total
+    );
+  }
+  else
+    Serial.println("Failed to get NVS usage stats");
+}
+
+/* helper function： print into in hex */
+void print_hex(uint8_t *data, int length) {
+  // print the data in hex one by one
+  for (int i = 0; i < length; i++) {
+    Serial.print(data[i], HEX);
+  }
+  // print a new line
+  Serial.println();
+}
 
 void setup() {
   /* 1. init setup */
@@ -56,13 +110,11 @@ void setup() {
   }
   // NEVER print the real private key
   Serial.println("Test private key generated: "); // print private key in hex
-  for (int i = 0; i < 32; i++) {
-    Serial.print(private_key[i], HEX);
-  }
+  print_hex(private_key, 32);
 
   // store pk in NVS
-  size_t private_key_size = sizeof(private_key);
-  if (nvs_set_blob(wallet_handle, "test_private_key", private_key, private_key_size) != ESP_OK) {
+  size_t private_key_size = 32;
+  if (nvs_set_blob(wallet_handle, "test", private_key, private_key_size) != ESP_OK) {
     Serial.println("❌ Failed to store private key");
   }
   else {
@@ -72,16 +124,13 @@ void setup() {
 
   // verify key retrieval
   uint8_t retrieved_private_key[32];
-  size_t retrieved_private_key_size = sizeof(retrieved_private_key);
-  if (nvs_get_blob(wallet_handle, "test_private_key", retrieved_private_key, &retrieved_private_key_size) != ESP_OK) {
+  size_t retrieved_private_key_size = 32;
+  if (nvs_get_blob(wallet_handle, "test", retrieved_private_key, &retrieved_private_key_size) != ESP_OK) {
     Serial.println("❌ Failed to retrieve private key");
   }
   else {
     Serial.println("✅ Private key retrieved successfully");
-    for (int i = 0; i < 32; i++) { // print retrieved private key in hex
-      Serial.print(retrieved_private_key[i], HEX);
-    }
-    Serial.println();
+    print_hex(retrieved_private_key, 32);
     // compare retrieved private key with original private key
     if (memcmp(private_key, retrieved_private_key, 32) == 0) {
       Serial.println("✅ Private key retrieved successfully");
@@ -92,6 +141,26 @@ void setup() {
   }
 
   /* Address derivation test */
+  // generate address from pk
+  uint8_t address[20];
+  if (ethers_privateKeyToAddress(retrieved_private_key, address)) {
+    Serial.println("✅ Address generated successfully");
+    Serial.print("Raw address: 0x");
+    print_hex(address, 20);
+  }
+  else {
+    Serial.println("❌ Address generation failed");
+  }
+
+  // generate checksum address
+  char checksum_address[43]; // "0x" + 40 bytes address + "\0"
+  if (ethers_privateKeyToChecksumAddress(retrieved_private_key, checksum_address)) {
+    Serial.println("✅ Checksum address generated successfully");
+    Serial.print("Checksum address: ");
+    Serial.println(checksum_address);
+  } else {
+    Serial.println("❌ Checksum address generation failed");
+  }
 
   /* Transaction signing test */
 
